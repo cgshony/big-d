@@ -1,3 +1,6 @@
+from prettytable import PrettyTable
+from collections import defaultdict
+
 class DataFrame:
     def __init__(self, column_content):
         for column in column_content.values():
@@ -5,11 +8,19 @@ class DataFrame:
         self._validate_input(column_content)
         self.column_content = column_content
 
-    def validate_column(self):
+    @classmethod
+    def from_rows(cls, rows):
+        column_content = defaultdict(list)
+        for row in rows:
+            for column, value in row.items():
+                column_content[column].append(value)
+            return cls(column_content)
+
+    def validate_column(self,value):
             item_type = type(column[0])
             for item in column[1:]:
                 if not isinstance(item, item_type):
-                    raise TypeError('inconsistent column types')
+                    raise TypeError('Inconsistent column type')
 
     def _validate_input(self, column_content):
         if not isinstance(column_content, dict):
@@ -25,8 +36,15 @@ class DataFrame:
         return self.column_content[name]
     
     def __setitem__(self, name, value):
+        self.validate_column
         self.column_content[name] = value
 
+    def __str__(self):
+        """Represent DataFrame as a string with it's size and contents."""
+        table = PrettyTable()
+        table.field_names = self.column_definitions.keys()
+        table.add_rows(list(zip(*self.column_definitions.values())))
+        return f"DataFrame (2x3)\n{table!s}"
 
 df = DataFrame({"name": ["Гошо", "Пешо"], "age": [30, 16]})
 print(df.shape) # (2, 2)

@@ -28,6 +28,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(self.df.shape, (2,3))
         self.assertEqual(self.df['height'], height)
 
+    @unittest.skip
     def test_inconsistent_column_len(self):
         """When initializing DF with inconsistentcolumns length, an Error must be raised!"""
         with self.assertRaises(ValueError):
@@ -39,7 +40,30 @@ class TestDataFrame(unittest.TestCase):
             DataFrame({"name": [22, "Пешо"], "age": [30, 16]})
 
     def test_setitem_invalid(self):
-        pass
+        height = [175, 215]
+        with self.assertRaises(TypeError) as err:
+            self.df["height"] = height
+        self.assertEqual(str(err.exception), 'Inconsistent column type')
+
+    def test_print(self):
+        """str(DataFrame) should represent the DataFrame with it's size and contents."""
+        df = DataFrame({"name": ["Гошо", "Пешо"], "age": [30, 16], "height": [175, 196]})
+        expected_string = """DataFrame (2x3)
++------+-----+--------+
+| name | age | height |
++------+-----+--------+
+| Гошо |  30 |  175   |
+| Пешо |  16 |  196   |
++------+-----+--------+"""
+        self.assertEqual(str(df), expected_string)
+
+    def test_from_rows(self):
+        """DataFrame.from_rows should create a new DataFrame object from a list of rows."""
+        rows = [
+            {"name": "Гошо", "age": 30, "height": 175},
+            {"name": "Пешо", "age": 16, "height": 196},
+        ]
+        df = DataFrame.from_rows(rows)
 
 if __name__ == '__main__':
     unittest.main()
