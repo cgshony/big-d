@@ -1,6 +1,6 @@
 import unittest
 
-from dataframe import DataFrame
+from dataframe import DataFrame, require_non_empty
 
 class TestDataFrame(unittest.TestCase):
     def setUp(self):
@@ -64,6 +64,23 @@ class TestDataFrame(unittest.TestCase):
             {"name": "Пешо", "age": 16, "height": 196},
         ]
         df = DataFrame.from_rows(rows)
+
+
+class TestValidators(unittest, TestCase):
+
+    def test_requite_non_empty(self):
+        dummy_func = lambda *args, **kwards: None
+        decorated = require_non_empty(dummy_func)
+        decorated(DataFrame({'number':[1, 2, 3, 4, 7]}), column_number='number')
+        self.assertEqual(result, None)
+
+    def test_requite_non_empty(self):
+        dummy_func = lambda *args, **kwards: None
+        decorated = require_non_empty(dummy_func)
+        with self.assertRaises(TypeError) as err:
+            result = decorated(DataFrame({}), column_number='number')
+        self.assertEqual(str(err.exception), 'Empty DF is not allowed')
+
 
 if __name__ == '__main__':
     unittest.main()
