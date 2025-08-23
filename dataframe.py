@@ -11,7 +11,7 @@ class DataFrame:
     def __init__(self, column_content):
         """Validate input data and initialize the Data frame."""
         for column in column_content.values():
-            self.validate_column(column)
+            self.is_valid_column(column)
         self._validate_input(column_content)
         self.column_content = column_content
 
@@ -44,7 +44,19 @@ class DataFrame:
         len_cols = len(self.column_content)
         return len_rows, len_cols
     
+    def filter(self, func):
+        """Filter the DataFrame..."""
+        rows = filter(func, self.as_rows())
+        return self.from_rows(list(rows))  # Immutable
     
+    def map_column(self, column_name, func):
+        """Apply a function to a column and return a new DataFrame."""
+        if column_name not in self.column_content:
+            raise KeyError(f"Column '{column_name}' not found.")
+        column_content = dict(self.column_content)
+        column_content[column_name] = [func(item) for item in column_content[column_name]]
+        return DataFrame(column_content)
+
     def __getitem__(self, name):
         """Enable indexing by column name."""
         return self.column_content[name]
@@ -71,19 +83,11 @@ class DataFrame:
             for index, item in enumerate(row):
                 if len(rows) <= index:
                     rows.append({})
-                row[index][col] = item
+                rows[index][col] = item
+        return rows
 
 
 df = DataFrame({"date": [1, 2, 3, 4]})
-
-
-    # def map_column(self, column_name, func):
-    #     column_content = dict(self.column_content.items)
-    #     column = self.column_content[column_name]
-    #     column = [func(item) for item in column]
-    #     column_content[column_name] = column
-    #     return DataFrame(column_content)
-
 
 def validate_column_types(**column_restrictions):
     """Decorate a function to check if columns
@@ -92,13 +96,50 @@ def validate_column_types(**column_restrictions):
     def decorator(func):
         def decorated(df, **kwargs):
             if not isinstance(df, DataFrame):
-                raise TypeError(f"Object {df} is not a DataFrame.")
+                raise TypeEsrror(f"Object {df} is not a DataFrame.")
             for column, column_type in column_restrictions.items():
                 if not isinstance(df[column][0], column_type):
                     raise TypeError(f"Type for column {column}, must be {column_type}")
             return func(df, **kwargs)
         return decorated
     return decorator
+
+class LazyFrame(DataFrame):
+    """A delayed evaluation of DataFrame"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._transformations = [] #queue to store func chaining
+
+    def filter(self, *args, **kwargs):
+        self._transformations.append(("filter", (args, kwargs)))
+        return self
+
+    def map_column(self, *args, **kwargs):
+        self._transformations.append(("map_column", (args, kwargs)))
+        return self
+
+    def collect(self):
+        df = DataFrame(self.column_content)
+        for transform_func, arguments in self._transformations:
+            args, kwargs = arguments
+            df = getattr(df, transform_func)(*args, **kwargs)
+        return df
+
+    def __str__(self):
+        """Represent DataFrame as a string with it's size and contents."""
+        table = PrettyTable()
+        table.field_names = self.column_content.keys()
+        table.add_rows(row for row in zip(*self.column_content.values()))        
+        return f"LazyFrame ({self.shape[0]}x{self.shape[1]})"
+
+lf = LazyFrame({"name": ["Гошо", "Тошо", "Пешо"], "age": [25, 35, 30], "height": [180, 140, 220]})
+lf = (lf.filter(lambda row: row["age"] >= 30)
+    .map_column("height", lambda x: x + 10)
+    .filter(lambda row: row["height"] >= 230))
+
+print(lf.collect())
+
 
 @validate_column_types(date=datetime)
 def extract_time_interval(df):
