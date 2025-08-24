@@ -2,6 +2,8 @@
 
 import csv
 from pathlib import Path
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from io import StringIO
 from collections import defaultdict
 from datetime import datetime
 
@@ -76,6 +78,27 @@ class DataFrame:
         column_content = dict(self.column_content)
         column_content[column_name] = [func(item) for item in column_content[column_name]]
         return DataFrame(column_content)
+
+    def map_column_parallel(self, column_name, func, max_workers):
+        """TODO:"""
+        column = self[column_name]
+        chunk_size = len(column) // max_workers
+        chunks = [column[index : index + chunk_size] for index in range(0, len(column), chunk_size)]
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            processed_chunks = tuple(executor.map(_apply_to_chunk, [(func, chunk) for chunk in chunks]))
+
+        new_column = [item for chunk in processed_chunks for item in chunk]
+        new_columns = dict(self.column_definitions)
+        new_columns[column_name] = new_column
+        return DataFrame(new_columns, schema=self.schema)
+
+    def _apply_to_chunk(args):
+        func, chunk = args
+        return [func(item) for item in chunk]
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        processed_chunks = tuple(executor.map(_apply_to_chunk, [(func, chunk) for chunk in chunks]))
+    # TODO: better solution than _apply_to_chunk
 
     def __getitem__(self, name):
         """Enable indexing by column name."""
@@ -165,20 +188,28 @@ class LazyFrame(DataFrame):
         return f"LazyFrame ({self.shape[0]}x{self.shape[1]})"
 
 
-def from_csv_bulk(paths):
-    """Create multiple DataFrames from a list of CSV paths."""
-    return tuple(DataFrame.from_csv(path) for path in paths)
+def from_csv_bulk(paths, max_workers):
+    """Create DataFrame objects, based on the contents of multiple *.csv files."""
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        return tuple(executor.map(DataFrame.from_csv, paths))
+    
 
 path_to_csv = r"C:\Users\Ivona Ivanova\big-d\customers-100.csv"
 df = from_csv_bulk([path_to_csv] * 4)
 print(df)
 
-# lf = LazyFrame({"name": ["Гошо", "Тошо", "Пешо"], "age": [25, 35, 30], "height": [180, 140, 220]})
-# lf = (lf.filter(lambda row: row["age"] >= 30)
-#     .map_column("height", lambda x: x + 10)
-#     .filter(lambda row: row["height"] >= 230))
+# urls = [
+#     "https://www.timestored.com/data/sample/chickweight.csv",
+#     "https://www.timestored.com/data/sample/dowjones.csv",
+#     "https://www.timestored.com/data/sample/healthexp.csv",
+#     "https://www.timestored.com/data/sample/iris.csv",
+#     "https://www.timestored.com/data/sample/iso10383_mic.csv",
+#     "https://www.timestored.com/data/sample/sunspots.csv",
+#     "https://www.timestored.com/data/sample/taxis.csv",
+#     "https://www.timestored.com/data/sample/titanic.csv",
+# ]
+# # df = DataFrame.from_csv(urls[5])
 
-# print(lf.collect())
 
 class SchemaError(Exception):
     """Raised when a schema validation error occurs"""
