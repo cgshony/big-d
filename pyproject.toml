@@ -1,0 +1,13 @@
+[project]
+dependencies = [
+    "build>=1.3.0",
+    "coverage>=7.9.2",
+    "pdoc>=15.0.4",
+    "pipenv>=2025.0.4",
+    "pre_commit>=4.2.0",
+    "prettytable>=3.16.0",
+    "requests>=2.32.4",
+    "ruff>=0.12.2",
+]
+name = "big-d"
+version = "0.1.0"

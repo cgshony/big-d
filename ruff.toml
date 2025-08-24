@@ -1,0 +1,17 @@
+line-length = 120
+indent-width = 4
+
+[lint]
+select = ["ALL"]
+ignore = [
+    "ANN",     # No annotations for now
+    "PT",      # Pytest
+    "EM",      # Error messages
+    "TRY003",  # Avoid specifying long messages outside the exception class
+    "PTH",     # pathlib.Path usage
+    "FIX002",  # Line contains TODO, consider resolving the issue
+    "TD003",   # Missing issue link for this TODO
+    "RUF001",  # We want to have Cyrillic
+    "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "PLR2004", # TODO: Disable for tests only
+]
