@@ -1,5 +1,7 @@
 """A module with a basic DataFrame implementaiton from scratch. WIP"""
 
+import csv
+from pathlib import Path
 from prettytable import PrettyTable
 from collections import defaultdict
 from datetime import datetime
@@ -10,32 +12,42 @@ class DataFrame:
 
     def __init__(self, column_content, schema=None):
         """Validate input data and initialize the Data frame."""
+        self._validate_input(column_content)
         for column in column_content.values():
             self.is_valid_column(column)
-        self._validate_input(column_content)
-        self.column_content = column_content
-        self.schema.validate(self.column_content)
+        super().__setattr__('column_content', column_content)
+        super().__setattr__('schema', schema)
+        if schema:
+            schema.validate(self.column_content)
+
+    def _validate_input(self, column_content):
+        if not isinstance(column_content, dict):
+            raise ValueError("Input must be a dictionary.")
+
+    def is_valid_column(self, column):
+        item_type = type(column[0])
+        for item in column[1:]:
+            if not isinstance(item, item_type):
+                raise TypeError("Inconsistent column type.")
+        return True
+
 
     @classmethod
     def from_rows(cls, rows):
-        """Create a DataFrame object from """
+        """Create a DataFrame object from some input lines """
         column_content = defaultdict(list)
         for row in rows:
             for column, value in row.items():
                 column_content[column].append(value)
             return cls(column_content)
-
-    def is_valid_column(self,column):
-            """Verify if column elements are consistent data types"""
-            item_type = type(column[0])
-            for item in column[1:]:
-                if not isinstance(item, item_type):
-                    raise TypeError('Inconsistent column type')
-                return True
-
-    def _validate_input(self, column_content):
-        if not isinstance(column_content, dict):
-            raise ValueError('Cannot instantiate. Please use a dictionary.')
+        
+    @classmethod
+    def from_csv(cls, path):
+        "Create a DataFrame obj, based in the contents of a .csv file."
+        with Path.open(path, encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        return cls.from_rows(rows)
 
     @property
     def shape(self):
@@ -83,8 +95,8 @@ class DataFrame:
     def __str__(self):
         """Represent DataFrame as a string with it's size and contents."""
         table = PrettyTable()
-        table.field_names = self.column_definitions.keys()
-        table.add_rows(row for row in zip(*self.column_definitions.values()))        
+        table.field_names = self.column_content.keys()
+        table.add_rows(list(zip(*self.column_content.values())))        
         return  f"DataFrame (2x3)\n{table!s}"
     
     def __bool__(self):
@@ -147,6 +159,10 @@ class LazyFrame(DataFrame):
         table.add_rows(row for row in zip(*self.column_content.values()))        
         return f"LazyFrame ({self.shape[0]}x{self.shape[1]})"
 
+path_to_csv = r"C:\Users\Ivona Ivanova\big-d\customers-100.csv"
+df = DataFrame.from_csv(path_to_csv)
+print(df)
+
 # lf = LazyFrame({"name": ["Гошо", "Тошо", "Пешо"], "age": [25, 35, 30], "height": [180, 140, 220]})
 # lf = (lf.filter(lambda row: row["age"] >= 30)
 #     .map_column("height", lambda x: x + 10)
@@ -170,10 +186,7 @@ class Schema:
              if not isinstance(column_contents[column][0], column_type):
                  raise SchemaError(f"Typo for column{column} must be {column_type} according to the schema.")
     
-df = DataFrame({"name": ["Гошо", "Тошо", "Пешо"], "age": [25, 35, 30], "height": [180, 140, 220]},
-               schema=Schema(name=str, age=int, height=int))
-print(df)
-
+    
 @validate_column_types(date=datetime)
 def extract_time_interval(df):
     """Extract the interval from the earliest to the latest
