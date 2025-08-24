@@ -2,10 +2,11 @@
 
 import csv
 from pathlib import Path
-from prettytable import PrettyTable
 from collections import defaultdict
 from datetime import datetime
 
+import requests
+from prettytable import PrettyTable
 
 class DataFrame:
     """TODO:"""
@@ -44,9 +45,15 @@ class DataFrame:
     @classmethod
     def from_csv(cls, path):
         "Create a DataFrame obj, based in the contents of a .csv file."
-        with Path.open(path, encoding="utf-8") as f:
-            reader = csv.DictReader(f)
+        if path.startswith("http"):
+            response = requests.get(path, timeout=5)
+            reader = csv.DictReader(StringIO(str(response.content, encoding="utf-8")))
             rows = list(reader)
+            return
+        else:
+            with Path.open(path, encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
         return cls.from_rows(rows)
 
     @property
@@ -112,9 +119,6 @@ class DataFrame:
                 rows[index][col] = item
         return rows
 
-
-df = DataFrame({"date": [1, 2, 3, 4]})
-
 def validate_column_types(**column_restrictions):
     """Decorate a function to check if columns
     with a certain name have a specific content type."""
@@ -129,6 +133,7 @@ def validate_column_types(**column_restrictions):
             return func(df, **kwargs)
         return decorated
     return decorator
+
 
 class LazyFrame(DataFrame):
     """A delayed evaluation of DataFrame"""
@@ -159,8 +164,13 @@ class LazyFrame(DataFrame):
         table.add_rows(row for row in zip(*self.column_content.values()))        
         return f"LazyFrame ({self.shape[0]}x{self.shape[1]})"
 
+
+def from_csv_bulk(paths):
+    """Create multiple DataFrames from a list of CSV paths."""
+    return tuple(DataFrame.from_csv(path) for path in paths)
+
 path_to_csv = r"C:\Users\Ivona Ivanova\big-d\customers-100.csv"
-df = DataFrame.from_csv(path_to_csv)
+df = from_csv_bulk([path_to_csv] * 4)
 print(df)
 
 # lf = LazyFrame({"name": ["Гошо", "Тошо", "Пешо"], "age": [25, 35, 30], "height": [180, 140, 220]})
