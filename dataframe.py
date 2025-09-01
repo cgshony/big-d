@@ -10,6 +10,8 @@ from datetime import datetime
 import requests
 from prettytable import PrettyTable
 
+import config
+
 class DataFrame:
     """TODO:"""
 
@@ -100,7 +102,7 @@ class DataFrame:
         processed_chunks = tuple(executor.map(_apply_to_chunk, [(func, chunk) for chunk in chunks]))
     # TODO: better solution than _apply_to_chunk
 
-    def __getitem__(self, name):
+    def __getitem__(self, index_or_col_name):
         """Enable indexing by column name."""
         return self.column_content[name]
     
@@ -126,12 +128,22 @@ class DataFrame:
         """Represent DataFrame as a string with it's size and contents."""
         table = PrettyTable()
         table.field_names = self.column_content.keys()
-        table.add_rows(list(zip(*self.column_content.values())))        
+        rows = list(zip(*self.column_content.values()))
+        if len(rows) >= MAX_ROWS:
+            table.add_rows(rows)   
+        else:
+            table.add_rows(rows[:MAX_ROWS//2])
+            table.add_row({"id":"...", "number":"..."})
+            table.add_rows(rows[-MAX_ROWS//2:])
         return  f"DataFrame (2x3)\n{table!s}"
     
     def __bool__(self):
         return bool(self.column_content)
     
+    def __iter__(self):
+        self.index = 0
+        return iter(self.as_rows())
+
     def as_rows(self):
         """transform df as an i"""
         rows = []
@@ -249,3 +261,6 @@ def avg(df, /, column_name):
     """Find the average value for a specific column."""
     column = df[column_name]
     return sum(column) / len(column)
+
+with config.config(max_rows=4):
+    print(df)
