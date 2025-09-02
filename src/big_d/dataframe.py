@@ -5,12 +5,15 @@ from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from io import StringIO
 from collections import defaultdict
-from datetime import datetime
+from pathlib import Path
 
 import requests
 from prettytable import PrettyTable
 
 import config
+
+RAND_MIN = 0
+RAND_MAX = 10000
 
 class DataFrame:
     """TODO:"""
@@ -59,6 +62,13 @@ class DataFrame:
                 reader = csv.DictReader(f)
                 rows = list(reader)
         return cls.from_rows(rows)
+    
+    @classmethod
+    def from_csv_bulk(cls, paths, max_workers):
+        """Create DataFrame objects, based on the contents of multiple *.csv files."""
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            return tuple(executor.map(cls.from_csv, paths))
+    
 
     @property
     def shape(self):
@@ -74,7 +84,23 @@ class DataFrame:
         return self.from_rows(list(rows))  # Immutable
     
     def map_column(self, column_name, func):
-        """Apply a function to a column and return a new DataFrame."""
+        """Apply a function to a column and return a new DataFrame.
+
+        Examples:
+        =========
+
+     urls = [
+        "https://www.timestored.com/data/sample/chickweight.csv",
+        "https://www.timestored.com/data/sample/dowjones.csv",
+        "https://www.timestored.com/data/sample/healthexp.csv",
+        "https://www.timestored.com/data/sample/iris.csv",
+        "https://www.timestored.com/data/sample/iso10383_mic.csv",
+        "https://www.timestored.com/data/sample/sunspots.csv",
+        "https://www.timestored.com/data/sample/taxis.csv",
+        "https://www.timestored.com/data/sample/titanic.csv",
+ ]
+       df = DataFrame.from_csv(urls[5])"""
+        
         if column_name not in self.column_content:
             raise KeyError(f"Column '{column_name}' not found.")
         column_content = dict(self.column_content)
@@ -86,17 +112,19 @@ class DataFrame:
         column = self[column_name]
         chunk_size = len(column) // max_workers
         chunks = [column[index : index + chunk_size] for index in range(0, len(column), chunk_size)]
+        
+        def _apply_to_chunk(args):
+            func, chunk = args
+            return [func(item) for item in chunk]
+    
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             processed_chunks = tuple(executor.map(_apply_to_chunk, [(func, chunk) for chunk in chunks]))
+        #TODO: implement better solution than _apply_to_chunk
 
         new_column = [item for chunk in processed_chunks for item in chunk]
         new_columns = dict(self.column_definitions)
         new_columns[column_name] = new_column
         return DataFrame(new_columns, schema=self.schema)
-
-    def _apply_to_chunk(args):
-        func, chunk = args
-        return [func(item) for item in chunk]
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         processed_chunks = tuple(executor.map(_apply_to_chunk, [(func, chunk) for chunk in chunks]))
@@ -154,21 +182,6 @@ class DataFrame:
                 rows[index][col] = item
         return rows
 
-def validate_column_types(**column_restrictions):
-    """Decorate a function to check if columns
-    with a certain name have a specific content type."""
-
-    def decorator(func):
-        def decorated(df, **kwargs):
-            if not isinstance(df, DataFrame):
-                raise TypeEsrror(f"Object {df} is not a DataFrame.")
-            for column, column_type in column_restrictions.items():
-                if not isinstance(df[column][0], column_type):
-                    raise TypeError(f"Type for column {column}, must be {column_type}")
-            return func(df, **kwargs)
-        return decorated
-    return decorator
-
 
 class LazyFrame(DataFrame):
     """A delayed evaluation of DataFrame"""
@@ -200,67 +213,9 @@ class LazyFrame(DataFrame):
         return f"LazyFrame ({self.shape[0]}x{self.shape[1]})"
 
 
-def from_csv_bulk(paths, max_workers):
-    """Create DataFrame objects, based on the contents of multiple *.csv files."""
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        return tuple(executor.map(DataFrame.from_csv, paths))
-    
-
 path_to_csv = r"C:\Users\Ivona Ivanova\big-d\customers-100.csv"
 df = from_csv_bulk([path_to_csv] * 4)
 print(df)
-
-# urls = [
-#     "https://www.timestored.com/data/sample/chickweight.csv",
-#     "https://www.timestored.com/data/sample/dowjones.csv",
-#     "https://www.timestored.com/data/sample/healthexp.csv",
-#     "https://www.timestored.com/data/sample/iris.csv",
-#     "https://www.timestored.com/data/sample/iso10383_mic.csv",
-#     "https://www.timestored.com/data/sample/sunspots.csv",
-#     "https://www.timestored.com/data/sample/taxis.csv",
-#     "https://www.timestored.com/data/sample/titanic.csv",
-# ]
-# # df = DataFrame.from_csv(urls[5])
-
-
-class SchemaError(Exception):
-    """Raised when a schema validation error occurs"""
-
-class Schema:
-    """Schema for validating data types for DataFrames"""
-    def __init__(self, **kwargs):
-        self._schema = kwargs
-
-    def validate(self, column_contents):
-         """Validate column definitions against schema expectations"""
-         for column, column_type in self._schema.items():
-             if column not in column_contents:
-                 raise SchemaError(f"Column {column} must be present according to the schema.")
-             if not isinstance(column_contents[column][0], column_type):
-                 raise SchemaError(f"Typo for column{column} must be {column_type} according to the schema.")
-    
-    
-@validate_column_types(date=datetime)
-def extract_time_interval(df):
-    """Extract the interval from the earliest to the latest
-    date in a DataFrame."""
-    dates = sorted(df["date"])
-    return dates[-1] - dates[0]
-
-def require_non_empty(func):
-    """Decorate a function to require a DataFrame with size > (0, 0)."""
-    def decorated(df, **kwargs):
-        if not isinstance(df, DataFrame):
-            raise TypeError(f"Object {df} is not a DataFrame.")
-        if not df:
-            raise TypeError(f"Empty DataFrame not allowed for {func.__name__}.")
-        return func(df, **kwargs)
-
-@require_non_empty
-def avg(df, /, column_name):
-    """Find the average value for a specific column."""
-    column = df[column_name]
-    return sum(column) / len(column)
 
 with config.config(max_rows=4):
     print(df)

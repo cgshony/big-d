@@ -1,3 +1,5 @@
+"""Configuration."""
+
 MAX_ROWS = 10000
 
 class _Config:

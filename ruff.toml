@@ -14,4 +14,5 @@ ignore = [
     "RUF001",  # We want to have Cyrillic
     "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
     "PLR2004", # TODO: Disable for tests only
+    "PTH",
 ]

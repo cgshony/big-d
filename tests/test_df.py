@@ -1,6 +1,12 @@
+"""Tests for the dataframe module."""
+
+import os
+import sys
 import unittest
 
-from dataframe import DataFrame, require_non_empty
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
+
+from big_d.dataframe import DataFrame, require_non_empty
 
 class TestDataFrame(unittest.TestCase):
     def setUp(self):
