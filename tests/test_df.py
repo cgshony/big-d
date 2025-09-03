@@ -8,17 +8,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src
 
 from big_d.dataframe import DataFrame, require_non_empty
 
+
 class TestDataFrame(unittest.TestCase):
     def setUp(self):
         self.df = DataFrame({"name": ["Гошо", "Пешо"], "age": [30, 16]})
-    
+
     def test_initialize_invalid_input(self):
         with self.assertRaises(ValueError):
             DataFrame([("Гошо", "Пешо"), ("age"), [30, 16]])
 
     def tearDown(self):
         del self.df
-    
+
     def test_df(self):
         self.assertEqual(self.df.shape, (2,2))
 
@@ -26,13 +27,13 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual
 
     def test_getitem(self):
-        self.assertEqual(self.df['age'], [30,16])
+        self.assertEqual(self.df["age"], [30,16])
 
     def test_setitem(self):
         height = [175, "по-висок от Стан"]
         self.df["height"] = height
         self.assertEqual(self.df.shape, (2,3))
-        self.assertEqual(self.df['height'], height)
+        self.assertEqual(self.df["height"], height)
 
     @unittest.skip
     def test_inconsistent_column_len(self):
@@ -49,7 +50,7 @@ class TestDataFrame(unittest.TestCase):
         height = [175, 215]
         with self.assertRaises(TypeError) as err:
             self.df["height"] = height
-        self.assertEqual(str(err.exception), 'Inconsistent column type')
+        self.assertEqual(str(err.exception), "Inconsistent column type")
 
     def test_print(self):
         """str(DataFrame) should represent the DataFrame with it's size and contents."""
@@ -77,16 +78,16 @@ class TestValidators(unittest, TestCase):
     def test_requite_non_empty(self):
         dummy_func = lambda *args, **kwards: None
         decorated = require_non_empty(dummy_func)
-        decorated(DataFrame({'number':[1, 2, 3, 4, 7]}), column_number='number')
+        decorated(DataFrame({"number":[1, 2, 3, 4, 7]}), column_number="number")
         self.assertEqual(result, None)
 
     def test_requite_non_empty(self):
         dummy_func = lambda *args, **kwards: None
         decorated = require_non_empty(dummy_func)
         with self.assertRaises(TypeError) as err:
-            result = decorated(DataFrame({}), column_number='number')
-        self.assertEqual(str(err.exception), 'Empty DF is not allowed')
+            result = decorated(DataFrame({}), column_number="number")
+        self.assertEqual(str(err.exception), "Empty DF is not allowed")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

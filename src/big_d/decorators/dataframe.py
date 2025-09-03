@@ -2,6 +2,7 @@
 
 from big_d.dataframe import DataFrame
 
+
 def require_non_empty(func):
     """Decorate a function to require a DataFrame with size > (0, 0)."""
 

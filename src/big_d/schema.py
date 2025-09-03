@@ -2,8 +2,10 @@
 
 from big_d.exceptions import SchemaError
 
+
 class Schema:
     """Schema for validating data types for DataFrames"""
+
     def __init__(self, **kwargs):
         self._schema = kwargs
 

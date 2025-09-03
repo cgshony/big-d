@@ -5,7 +5,8 @@ from big_d.dataframe import DataFrame
 
 def validate_column_types(**column_restrictions):
     """Decorate a function to check if columns
-    with a certain name have a specific content type."""
+    with a certain name have a specific content type.
+    """
 
     def decorator(func):
         def decorated(df, **kwargs):
