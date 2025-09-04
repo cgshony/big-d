@@ -1,4 +1,4 @@
-"""Validators for DataFrame-based operations"""
+"""Validators for DataFrame-based operations."""
 
 from big_d.dataframe import DataFrame
 
@@ -12,4 +12,5 @@ def require_non_empty(func):
         if not df:
             raise TypeError(f"Empty DataFrame not allowed for {func.__name__}.")
         return func(df, **kwargs)
+
     return decorated

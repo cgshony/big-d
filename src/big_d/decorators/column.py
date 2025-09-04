@@ -16,5 +16,7 @@ def validate_column_types(**column_restrictions):
                 if not isinstance(df[column][0], column_type):
                     raise TypeError(f"Type for column {column}, must be {column_type}")
             return func(df, **kwargs)
+
         return decorated
+
     return decorator

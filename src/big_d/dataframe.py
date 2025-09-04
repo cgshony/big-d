@@ -1,4 +1,4 @@
-"""A module with a basic DataFrame implementaiton from scratch. WIP"""
+"""A module with a basic DataFrame implementaiton from scratch. WIP."""
 
 import csv
 from collections import defaultdict
@@ -41,12 +41,13 @@ class DataFrame:
 
     @classmethod
     def from_rows(cls, rows):
-        """Create a DataFrame object from some input lines"""
+        """Create a DataFrame object from some input lines."""
         column_content = defaultdict(list)
         for row in rows:
             for column, value in row.items():
                 column_content[column].append(value)
             return cls(column_content)
+        return None
 
     @classmethod
     def from_csv(cls, path):
@@ -69,7 +70,7 @@ class DataFrame:
 
     @property
     def shape(self):
-        """Dimensions of the DataFrame (rows, columns)"""
+        """Dimensions of the DataFrame (rows, columns)."""
         assert self
         len_rows = max(len(row) for row in self.column_content.values())
         len_cols = len(self.column_content)
@@ -117,12 +118,20 @@ class DataFrame:
 
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             processed_chunks = tuple(executor.map(_apply_to_chunk, [(func, chunk) for chunk in chunks]))
-        #TODO: implement better solution than _apply_to_chunk
+        # TODO: implement better solution than _apply_to_chunk
 
         new_column = [item for chunk in processed_chunks for item in chunk]
         new_columns = dict(self.column_definitions)
         new_columns[column_name] = new_column
         return DataFrame(new_columns, schema=self.schema)
+
+    def __eq__(self, other):
+        """Compare dataframe objects."""
+        return self.column_content == other.column_content
+
+    def __hash__(self):
+        """Get dataframe hash."""
+        return hash(str(self))
 
     def __getitem__(self, index_or_col_name):
         """Enable indexing by column name."""
@@ -133,12 +142,12 @@ class DataFrame:
         self.validate_column
         self.column_content[name] = value
 
-    def __getattr__(self,name):
+    def __getattr__(self, name):
         """Get column by attribute access."""
         return self.column_content[name]
 
     def __setattr__(self, name, value):
-        """Set column via attribute access"""
+        """Set column via attribute access."""
         if name != "column definitions" and name in self.column_content:
             self.is_valid_column(value)
             self.column_content[name] = value
@@ -153,10 +162,10 @@ class DataFrame:
         if len(rows) >= MAX_ROWS:
             table.add_rows(rows)
         else:
-            table.add_rows(rows[:MAX_ROWS//2])
-            table.add_row({"id":"...", "number":"..."})
-            table.add_rows(rows[-MAX_ROWS//2:])
-        return  f"DataFrame (2x3)\n{table!s}"
+            table.add_rows(rows[: MAX_ROWS // 2])
+            table.add_row({"id": "...", "number": "..."})
+            table.add_rows(rows[-MAX_ROWS // 2 :])
+        return f"DataFrame (2x3)\n{table!s}"
 
     def __bool__(self):
         return bool(self.column_content)
@@ -166,9 +175,9 @@ class DataFrame:
         return iter(self.as_rows())
 
     def as_rows(self):
-        """Transform df as an i"""
+        """Transform df as an i."""
         rows = []
-        for col, row in self.column_content. items():
+        for col, row in self.column_content.items():
             for index, item in enumerate(row):
                 if len(rows) <= index:
                     rows.append({})
@@ -177,11 +186,11 @@ class DataFrame:
 
 
 class LazyFrame(DataFrame):
-    """A delayed evaluation of DataFrame"""
+    """A delayed evaluation of DataFrame."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._transformations = [] #queue to store func chaining
+        self._transformations = []  # queue to store func chaining
 
     def filter(self, *args, **kwargs):
         self._transformations.append(("filter", (args, kwargs)))
@@ -208,7 +217,6 @@ class LazyFrame(DataFrame):
 
 path_to_csv = r"C:\Users\Ivona Ivanova\big-d\customers-100.csv"
 df = DataFrame.from_csv_bulk([path_to_csv] * 4, max_workers=4)
-print(df)
 
 with config.config(max_rows=4):
-    print(df)
+    pass

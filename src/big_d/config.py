@@ -2,6 +2,7 @@
 
 MAX_ROWS = 10000
 
+
 class _Config:
     def __init__(self, max_rows):
         self.max_rows = max_rows
