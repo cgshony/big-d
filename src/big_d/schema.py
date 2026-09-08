@@ -19,5 +19,6 @@ class Schema:
         for column, column_type in self._schema.items():
             if column not in column_contents:
                 raise SchemaError(f"Column {column} must be present according to the schema.")
-            if not isinstance(column_contents[column][0], column_type):
-                raise SchemaError(f"Typo for column{column} must be {column_type} according to the schema.")
+            values = [value for value in column_contents[column] if value is not None]
+            if values and not isinstance(values[0], column_type):
+                raise SchemaError(f"Type for column {column} must be {column_type} according to the schema.")

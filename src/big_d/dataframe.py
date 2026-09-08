@@ -1,7 +1,7 @@
 """A module with a basic DataFrame implementaiton from scratch. WIP."""
 
 import csv
-from collections import defaultdict
+from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from io import StringIO
 from pathlib import Path
@@ -33,9 +33,16 @@ class DataFrame:
             raise ValueError("Input must be a dictionary.")
 
     def is_valid_column(self, column):
-        """Verify if a column has members of the same type."""
-        item_type = type(column[0])
-        for item in column[1:]:
+        """Verify if a column has members of the same type.
+
+        `None` is treated as a null/missing marker and is allowed
+        alongside any type.
+        """
+        non_null = [item for item in column if item is not None]
+        if not non_null:
+            return True
+        item_type = type(non_null[0])
+        for item in non_null[1:]:
             if not isinstance(item, item_type):
                 raise TypeError("Inconsistent column type.")
         return True
@@ -135,9 +142,29 @@ class DataFrame:
         """Get dataframe hash."""
         return hash(str(self))
 
-    def __getitem__(self, index_or_col_name):
-        """Enable indexing by column name."""
-        return self.column_content[index_or_col_name]
+    def __getitem__(self, key):
+        """Select a column, a subset of columns, or a subset of rows.
+
+        - `df["col"]` -> that column, as a list.
+        - `df[["col_a", "col_b"]]` -> a new DataFrame with just those columns.
+        - `df[3]` -> the row at that position, as a dict.
+        - `df[1:5]` -> a new DataFrame with those rows.
+        - `df[[True, False, ...]]` -> a new DataFrame kept where the mask is True.
+        """
+        if isinstance(key, str):
+            return self.column_content[key]
+        if isinstance(key, slice):
+            return self.from_rows(self.as_rows()[key])
+        if isinstance(key, int):
+            return self.as_rows()[key]
+        if isinstance(key, (list, tuple)):
+            if key and all(isinstance(item, str) for item in key):
+                return DataFrame({column: self.column_content[column] for column in key}, schema=self.schema)
+            if key and all(isinstance(item, bool) for item in key):
+                rows = [row for row, keep in zip(self.as_rows(), key, strict=True) if keep]
+                return self.from_rows(rows)
+            raise TypeError("List indices must be all column names (str) or all booleans (a mask).")
+        raise TypeError(f"Unsupported index type: {type(key).__name__}")
 
     def __setitem__(self, name, value):
         """Enable setting a new column."""
@@ -188,6 +215,100 @@ class DataFrame:
                     rows.append({})
                 rows[index][col] = item
         return rows
+
+    def isna(self):
+        """Return a same-shaped DataFrame of booleans marking `None` values."""
+        return DataFrame({column: [item is None for item in values] for column, values in self.column_content.items()})
+
+    def dropna(self):
+        """Return a new DataFrame with every row that contains a `None` value removed."""
+        rows = [row for row in self.as_rows() if not any(value is None for value in row.values())]
+        return self.from_rows(rows)
+
+    def _validate_join_keys(self, other, keys):
+        missing_left = [key for key in keys if key not in self.column_content]
+        missing_right = [key for key in keys if key not in other.column_content]
+        if missing_left or missing_right:
+            raise KeyError(f"Join column(s) missing: left={missing_left}, right={missing_right}")
+
+    def _join_left_rows(self, key_of, combine, right_by_key, how):
+        """Match every left row against `right_by_key`, applying `how`'s unmatched-row policy."""
+        result_rows = []
+        matched_keys = set()
+        for left_row in self.as_rows():
+            key = key_of(left_row)
+            matches = right_by_key.get(key, [])
+            if matches:
+                matched_keys.add(key)
+                result_rows.extend(combine(left_row, right_row) for right_row in matches)
+            elif how in ("left", "outer"):
+                result_rows.append(combine(left_row, None))
+        return result_rows, matched_keys
+
+    def merge(self, other, on, how="inner", suffixes=("_x", "_y")):
+        """Join with another DataFrame on one or more shared columns, via a hash join.
+
+        `on` is a column name, or a list of column names, present in
+        both frames. `how` is one of "inner", "left", "right", "outer".
+        Non-key columns present in both frames are disambiguated with
+        `suffixes`.
+        """
+        if how not in {"inner", "left", "right", "outer"}:
+            raise ValueError(f"Unsupported join type: {how!r}")
+        keys = [on] if isinstance(on, str) else list(on)
+        self._validate_join_keys(other, keys)
+
+        left_columns = [column for column in self.column_content if column not in keys]
+        right_columns = [column for column in other.column_content if column not in keys]
+        shared = set(left_columns) & set(right_columns)
+
+        def key_of(row):
+            return tuple(row[key] for key in keys)
+
+        def combine(left_row, right_row):
+            merged = {key: (left_row or right_row)[key] for key in keys}
+            for column in left_columns:
+                name = f"{column}{suffixes[0]}" if column in shared else column
+                merged[name] = left_row[column] if left_row is not None else None
+            for column in right_columns:
+                name = f"{column}{suffixes[1]}" if column in shared else column
+                merged[name] = right_row[column] if right_row is not None else None
+            return merged
+
+        right_rows = other.as_rows()
+        right_by_key = defaultdict(list)
+        for row in right_rows:
+            right_by_key[key_of(row)].append(row)
+
+        result_rows, matched_keys = self._join_left_rows(key_of, combine, right_by_key, how)
+        if how in ("right", "outer"):
+            result_rows.extend(
+                combine(None, right_row) for right_row in right_rows if key_of(right_row) not in matched_keys
+            )
+        return self.from_rows(result_rows)
+
+    def groupby(self, by):
+        """Group rows by the values of column `by`, ready for `.agg(...)` or a built-in aggregation."""
+        from big_d.groupby import GroupBy  # local import avoids a circular import
+
+        return GroupBy(self, by)
+
+    def value_counts(self, column_name):
+        """Count occurrences of each distinct value in a column, most common first."""
+        counts = Counter(self.column_content[column_name]).most_common()
+        return DataFrame({column_name: [value for value, _ in counts], "count": [count for _, count in counts]})
+
+    def fillna(self, value):
+        """Return a new DataFrame with `None` values replaced.
+
+        `value` is either a single value applied to every column, or a
+        dict mapping column name to the value used for that column.
+        """
+        column_content = {}
+        for column, values in self.column_content.items():
+            fill = value.get(column, None) if isinstance(value, dict) else value
+            column_content[column] = [fill if item is None else item for item in values]
+        return DataFrame(column_content, schema=self.schema)
 
 
 class LazyFrame(DataFrame):
