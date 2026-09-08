@@ -33,7 +33,7 @@ class TestDataFrame(unittest.TestCase):
         self.assertEqual(self.df["age"], [30, 16])
 
     def test_setitem(self):
-        height = [175, "по-висок от Стан"]
+        height = [175, 196]
         self.df["height"] = height
         self.assertEqual(self.df.shape, (2, 3))
         self.assertEqual(self.df["height"], height)
@@ -50,10 +50,10 @@ class TestDataFrame(unittest.TestCase):
             DataFrame({"name": [22, "Пешо"], "age": [30, 16]})
 
     def test_setitem_invalid(self):
-        height = [175, 215]
+        height = [175, "по-висок от Стан"]
         with self.assertRaises(TypeError) as err:
             self.df["height"] = height
-        self.assertEqual(str(err.exception), "Inconsistent column type")
+        self.assertEqual(str(err.exception), "Inconsistent column type.")
 
     def test_print(self):
         """str(DataFrame) should represent the DataFrame with it's size and contents."""
@@ -115,14 +115,14 @@ class TestDataFrame(unittest.TestCase):
     def test_is_valid_column_good_weather(self):
         """Validating a column of consistent types."""
         column = [172, 173, 174]
-        self.asserTrue(self.df.is_valid_column(column))
+        self.assertTrue(self.df.is_valid_column(column))
 
     def test_is_valid_column_bad_weather(self):
         """Validating a column of inconsistent types resulting in TypeError."""
         column = [172, 173, "another_type"]
         with self.assertRaises(TypeError) as err:
             self.df.is_valid_column(column)
-        self.assertEqual(str(err.exception), "Inconsistent column types.")
+        self.assertEqual(str(err.exception), "Inconsistent column type.")
 
     def test_filter_gw(self):
         """Test filtering in good weather."""
@@ -150,23 +150,23 @@ class TestDataFrame(unittest.TestCase):
             to_be_filtered.filter(uncallable)
 
 
-class TestValidators(unittest, TestCase):
-    def test_requite_non_empty(self):
+class TestValidators(unittest.TestCase):
+    def test_require_non_empty_success(self):
         def dummy_func(*args, **kwards):
             return None
 
         decorated = require_non_empty(dummy_func)
-        decorated(DataFrame({"number": [1, 2, 3, 4, 7]}), column_number="number")
+        result = decorated(DataFrame({"number": [1, 2, 3, 4, 7]}), column_number="number")
         self.assertEqual(result, None)
 
-    def test_requite_non_empty(self):
+    def test_require_non_empty_raises_when_empty(self):
         def dummy_func(*args, **kwards):
             return None
 
         decorated = require_non_empty(dummy_func)
         with self.assertRaises(TypeError) as err:
             decorated(DataFrame({}), column_number="number")
-        self.assertEqual(str(err.exception), "Empty DF is not allowed")
+        self.assertEqual(str(err.exception), "Empty DataFrame not allowed for dummy_func.")
 
 
 if __name__ == "__main__":
