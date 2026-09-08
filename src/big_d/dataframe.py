@@ -6,9 +6,10 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from io import StringIO
 from pathlib import Path
 
-import config
 import requests
 from prettytable import PrettyTable
+
+from big_d import config
 
 RAND_MIN = 0
 RAND_MAX = 10000
@@ -46,8 +47,9 @@ class DataFrame:
         for row in rows:
             for column, value in row.items():
                 column_content[column].append(value)
-            return cls(column_content)
-        return None
+        if not column_content:
+            return None
+        return cls(dict(column_content))
 
     @classmethod
     def from_csv(cls, path):
@@ -57,7 +59,7 @@ class DataFrame:
             reader = csv.DictReader(StringIO(str(response.content, encoding="utf-8")))
             rows = list(reader)
             return None
-        with Path.open(path, encoding="utf-8") as f:
+        with Path(path).open(encoding="utf-8") as f:
             reader = csv.DictReader(f)
             rows = list(reader)
         return cls.from_rows(rows)
@@ -121,7 +123,7 @@ class DataFrame:
         # TODO: implement better solution than _apply_to_chunk
 
         new_column = [item for chunk in processed_chunks for item in chunk]
-        new_columns = dict(self.column_definitions)
+        new_columns = dict(self.column_content)
         new_columns[column_name] = new_column
         return DataFrame(new_columns, schema=self.schema)
 
@@ -135,11 +137,11 @@ class DataFrame:
 
     def __getitem__(self, index_or_col_name):
         """Enable indexing by column name."""
-        return self.column_content[name]
+        return self.column_content[index_or_col_name]
 
     def __setitem__(self, name, value):
         """Enable setting a new column."""
-        self.validate_column
+        self.is_valid_column(value)
         self.column_content[name] = value
 
     def __getattr__(self, name):
@@ -159,13 +161,16 @@ class DataFrame:
         table = PrettyTable()
         table.field_names = self.column_content.keys()
         rows = list(zip(*self.column_content.values()))
-        if len(rows) >= MAX_ROWS:
+        max_rows = config.MAX_ROWS
+        if len(rows) <= max_rows:
             table.add_rows(rows)
         else:
-            table.add_rows(rows[: MAX_ROWS // 2])
-            table.add_row({"id": "...", "number": "..."})
-            table.add_rows(rows[-MAX_ROWS // 2 :])
-        return f"DataFrame (2x3)\n{table!s}"
+            half = max_rows // 2
+            table.add_rows(rows[:half])
+            table.add_row(["..."] * len(table.field_names))
+            table.add_rows(rows[-half:])
+        num_rows, num_cols = self.shape
+        return f"DataFrame ({num_rows}x{num_cols})\n{table!s}"
 
     def __bool__(self):
         return bool(self.column_content)
@@ -215,8 +220,9 @@ class LazyFrame(DataFrame):
         return f"LazyFrame ({self.shape[0]}x{self.shape[1]})"
 
 
-path_to_csv = r"C:\Users\Ivona Ivanova\big-d\customers-100.csv"
-df = DataFrame.from_csv_bulk([path_to_csv] * 4, max_workers=4)
+if __name__ == "__main__":
+    path_to_csv = Path(__file__).resolve().parents[2] / "customers-100.csv"
+    dfs = DataFrame.from_csv_bulk([str(path_to_csv)] * 4, max_workers=4)
 
-with config.config(max_rows=4):
-    pass
+    with config.config(max_rows=4):
+        print(dfs[0])
