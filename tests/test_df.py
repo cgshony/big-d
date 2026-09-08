@@ -3,11 +3,13 @@
 import os
 import sys
 import unittest
+from unittest import mock
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(__file__)), "src"))
 
-from dataframe import DataFrame, require_non_empty
+from big_d.dataframe import DataFrame
+from big_d.decorators.dataframe import require_non_empty
 
 
 class TestDataFrame(unittest.TestCase):
@@ -79,7 +81,7 @@ class TestDataFrame(unittest.TestCase):
             {"name": "Гошо", "age": 30, "height": 175},
             {"name": "Пешо", "age": 16, "height": 196},
         ]
-        with patch("dataframe.Path.open"), patch("dataframe.csv.DictReader", return_value=rows):
+        with patch("big_d.dataframe.Path.open"), patch("big_d.dataframe.csv.DictReader", return_value=rows):
             df = DataFrame.from_csv("Some_path.csv")
         self.assertIsInstance(df, DataFrame)
 
